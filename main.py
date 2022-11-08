@@ -3,6 +3,10 @@ import collections
 import os
 import re
 
+from typing import Dict
+from pyecharts import options as opts
+from pyecharts.charts import Pie, Page
+
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 
@@ -82,7 +86,7 @@ def match_vma_vmFlags(line):
     return re.match(r'(\w*)\s*:\s+([0-9]+)\skB', line)
 
 
-class SysMaps(list[Vma]):
+class SysMaps(list):
 
     def __init__(self, contents: collections):
         super().__init__()
@@ -100,28 +104,6 @@ class SysMaps(list[Vma]):
                 attr_key = matched.group(1)
                 attr_value = matched.group(2)
                 vma_parsing.mem.__setattr__(attr_key, int(attr_value))
-            # else:
-            # print('unKnown type %s' % content)
-
-
-#
-# class Heap(Enum):
-#     UNKNOWN = 0
-#     DALVIK = auto()
-#     NATIVE = auto()
-#     DALVIK_OTHER = auto()
-#     STACK = auto()
-#     CURSOR = auto()
-#     ASHMEM = auto()
-#     SO = auto()
-#     JAR = auto()
-#     APK = auto()
-#     TTF = auto()
-#     DEX = auto()
-#     OAT = auto()
-#     ART = auto()
-#     GL_DEV = auto()
-#     UNKNOWN_DEV = auto()
 
 
 class HeapType:
@@ -191,7 +173,7 @@ HEAP_DEX_APP_VDEX = make_HeapType(24, 4)
 HEAP_ART_APP = make_HeapType(25, 1)
 HEAP_ART_BOOT = make_HeapType(25, 2)
 
-HEAP_MMAP: dict[str, HeapType] = {
+HEAP_MMAP: Dict[str, HeapType] = {
     r'^\[heap\]': HEAP_NATIVE,
     r'^\[anon:libc_malloc\]': HEAP_NATIVE,
     r'^\[anon:scudo:': HEAP_NATIVE,
@@ -235,26 +217,42 @@ HEAP_MMAP: dict[str, HeapType] = {
     r'.+': HEAP_UNKNOWN_MAP
 }
 
-if __name__ == '__main__':
-    mydata = SysMaps(os.popen("adb shell cat /proc/$(pidof com.android.settings)/smaps"))
-    pc = 0
-    for vma in mydata:
-        # type_match = None
-        regx_match = ""
-        matched_heap = None
-        name = vma.name.removesuffix("(deleted)")
-        for regx, which_heap in HEAP_MMAP.items():
-            HEAP_MMAP[regx].getType()
-            if re.match(regx, vma.name):
-                regx_match = regx
-                matched_heap = which_heap
-                break
-        if matched_heap.sameAs(HEAP_DALVIK) or matched_heap.sameAs(HEAP_ART):
-            pc += vma.mem.Private_Dirty
-        if matched_heap.sameAs(HEAP_ART):
-            pc += vma.mem.Private_Clean
-            print(pc)
 
-        # if name.__contains__("large"):
-        #     print(name + ":"+regx_match)
+def totalDict(dicts, totalKeys):
+    total = 0
+    for totalKey in totalKeys:
+        total += int(dicts[totalKey])
+    return total
+
+
+def createPie(datas, title) -> Pie:
+    pie = Pie()
+    pie.add("", datas)
+    pie.set_global_opts(title_opts=opts.TitleOpts(title=title),
+                        legend_opts=opts.LegendOpts(
+                            pos_right="right",
+                            orient="vertical",
+                            is_show=False)
+                        )
+    pie.set_series_opts(label_opts=opts.LabelOpts(formatter="{b}  {c} : ({d})%"))
+    return pie
+
+
+if __name__ == '__main__':
+    mydata = SysMaps(open("/home/ubuntu/sensors/F10smaps.txt"))
+    # mydata = SysMaps(os.popen("adb shell cat /proc/$(pidof com.android.settings)/smaps"))
+    # pc = 0
+    # for vma in mydata:
+
+    key = "Pss"
+    mydata.sort(key=lambda vma: totalDict(vma.mem.__dict__, ["Pss"]), reverse=True)
+
+    for item in mydata:
+        print("name:" + item.name + " pss:" + str(item.mem.Pss))
+
+    pie_data_titles = [i_item.name for i_item in mydata]
+    pie_data_values = [i_item.mem.Pss for i_item in mydata]
+    data = list(zip(pie_data_titles, pie_data_values))
+    createPie(data, "Pss")
+
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
