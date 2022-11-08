@@ -1,109 +1,16 @@
-# This is a sample Python script.
-import collections
 import os
-import re
-
 from typing import Dict
+
 from pyecharts import options as opts
-from pyecharts.charts import Pie, Page
+from pyecharts.charts import Pie
 
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-
+import sysmaps
+from sysmaps import SysMaps
 
 _HEAP_BIT = 16
 _HEAP_MASK = 0xFFFF << 16
 _HEAP_SUB_BIT = 0
 _HEAP_SUB_MASK = 0xFFFF
-
-
-def make_flags(flags_str: str):
-    temp_flags = 0
-    for flag_char in flags_str.upper():
-        if flag_char in Vma.FLAGS_MMAP:
-            temp_flags |= Vma.FLAGS_MMAP[flag_char]
-    return temp_flags
-
-
-def pop_hex(hex_str: list):
-    return int(hex_str.pop(0), 16)
-
-
-class MemUsage:
-    def __str__(self):
-        return str(self.__dict__)
-
-
-class Vma:
-    start: int
-    end: int
-    flags: int
-    offset: int
-    major: int
-    minor: int
-    inode: int
-    name: str
-    mem: MemUsage
-
-    _FLAG_READ = 1
-    _FLAG_WRITE = 1 << 1
-    _FLAG_EXEC = 1 << 2
-    _FLAG_SHARED = 1 << 3
-    FLAGS_MMAP = {
-        'R': _FLAG_READ,
-        'W': _FLAG_WRITE,
-        'X': _FLAG_EXEC,
-        'S': _FLAG_SHARED
-    }
-
-    def __init__(self, res: list):
-        self.start, self.end = pop_hex(res), pop_hex(res)
-        self.flags = make_flags(res.pop(0))
-        self.name = res.pop()
-        self.offset, self.major, self.minor, self.inode = list(map(lambda x: int(x, 16), res))
-        self.mem = MemUsage()
-
-    def __str__(self):
-        return str(self.mem.__str__())
-
-
-def match_vma(line):
-    return re.match(r'^([0-9a-fA-F]+)-'
-                    r'([0-9a-fA-F]+)\s'
-                    r'([rw\-xsp]+)\s'
-                    r'([0-9a-fA-F]+)\s'
-                    r'([0-9a-fA-F]+):'
-                    r'([0-9a-fA-F]+)\s'
-                    r'([0-9a-fA-F]+)\s*'
-                    r'(.+)$', line, re.I)
-
-
-def match_vma_attrs(line):
-    return re.match(r'(\w*)\s*:\s+([0-9]+)\skB', line)
-
-
-def match_vma_vmFlags(line):
-    return re.match(r'(\w*)\s*:\s+([0-9]+)\skB', line)
-
-
-class SysMaps(list):
-
-    def __init__(self, contents: collections):
-        super().__init__()
-        vma_parsing = None
-        for content in contents:
-            matched = match_vma(content)
-            if matched:
-                if vma_parsing:
-                    self.append(vma_parsing)
-                vma_parsing = Vma(list(matched.groups()))
-                continue
-
-            matched = match_vma_attrs(content)
-            if matched:
-                attr_key = matched.group(1)
-                attr_value = matched.group(2)
-                vma_parsing.mem.__setattr__(attr_key, int(attr_value))
 
 
 class HeapType:
@@ -239,20 +146,10 @@ def createPie(datas, title) -> Pie:
 
 
 if __name__ == '__main__':
-    mydata = SysMaps(open("/home/ubuntu/sensors/F10smaps.txt"))
-    # mydata = SysMaps(os.popen("adb shell cat /proc/$(pidof com.android.settings)/smaps"))
-    # pc = 0
-    # for vma in mydata:
-
+    # mydata = SysMaps(open("/home/ubuntu/sensors/F10smaps.txt"))
+    mydata = SysMaps(os.popen("adb shell cat /proc/$(pidof com.android.settings)/smaps"))
     key = "Pss"
-    mydata.sort(key=lambda vma: totalDict(vma.mem.__dict__, ["Pss"]), reverse=True)
+    mydata.sort(key=lambda vma: totalDict(vma, [sysmaps.VMA_ATTR_PSS]), reverse=True)
+    mydata.getDataBase().query()
 
-    for item in mydata:
-        print("name:" + item.name + " pss:" + str(item.mem.Pss))
-
-    pie_data_titles = [i_item.name for i_item in mydata]
-    pie_data_values = [i_item.mem.Pss for i_item in mydata]
-    data = list(zip(pie_data_titles, pie_data_values))
-    createPie(data, "Pss")
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    # print(mydata[0].__dict__)
