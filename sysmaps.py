@@ -3,6 +3,7 @@ import collections
 import re
 import sqlite3
 from sqlite3 import Cursor, Connection
+from typing import Dict, List
 
 _FLAG_READ = 1
 _FLAG_WRITE = 1 << 1
@@ -101,8 +102,8 @@ class SmapsDatabase:
         elif type(typed) == str:
             return 'TEXT'
 
-    def __init__(self, sample: dict):
-        self.conn = sqlite3.connect(':memory:')
+    def __init__(self, sample: dict, database_name):
+        self.conn = sqlite3.connect(database_name)
         self.conn.row_factory = SmapsDatabase.dict_factory
         self.cursor = self.conn.cursor()
         layout = ""
@@ -133,17 +134,20 @@ class SmapsDatabase:
         self.cursor.execute(query, dict_data)
         self.conn.commit()
 
-    def query(self):
-        result = self.cursor.execute("select * from smaps")
-        for c in result:
-            print(c)
+    def execute(self, sql_command, commit=False):
+        result = self.cursor.execute(sql_command)
+        if commit:
+            self.conn.commit()
+        return result
 
 
-class SysMaps(list[dict]):
+class SysMaps(List[Dict]):
     db: SmapsDatabase = None
+    label = None
 
-    def __init__(self, contents: collections):
+    def __init__(self, contents: collections, label=':memory:'):
         super().__init__()
+        self.label = label
         vma_parsing = None
         for content in contents:
             matched = match_vma(content)
@@ -164,7 +168,7 @@ class SysMaps(list[dict]):
         if self.db:
             return self.db
         else:
-            self.db = SmapsDatabase(self[0])
+            self.db = SmapsDatabase(self[0], self.label)
             for i in self:
                 self.db.insert(i)
 

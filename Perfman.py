@@ -2,7 +2,7 @@ import os
 from typing import Dict
 
 from pyecharts import options as opts
-from pyecharts.charts import Pie
+from pyecharts.charts import Pie, Page
 
 import sysmaps
 from sysmaps import SysMaps
@@ -145,11 +145,14 @@ def createPie(datas, title) -> Pie:
     return pie
 
 
-if __name__ == '__main__':
-    # mydata = SysMaps(open("/home/ubuntu/sensors/F10smaps.txt"))
-    mydata = SysMaps(os.popen("adb shell cat /proc/$(pidof com.android.settings)/smaps"))
-    key = "Pss"
-    mydata.sort(key=lambda vma: totalDict(vma, [sysmaps.VMA_ATTR_PSS]), reverse=True)
-    mydata.getDataBase().query()
+def method_name(pie_data, pie_title):
+    pie_data_title = [dict_item[sysmaps.VMA_ATTR_NAME] for dict_item in pie_data]
+    pie_data_value = [dict_item['value'] for dict_item in pie_data]
+    print(pie_data_value)
+    pie_data = list(zip(pie_data_title, pie_data_value))
+    return createPie(pie_data, pie_title)
 
-    # print(mydata[0].__dict__)
+
+if __name__ == '__main__':
+    dut = SysMaps(open("/home/ubuntu/Temp/smaps"), "calendar.db")
+    dut.getDataBase()
