@@ -3,7 +3,6 @@ import collections
 import re
 import sqlite3
 from sqlite3 import Cursor, Connection
-from typing import Dict, List
 
 _FLAG_READ = 1
 _FLAG_WRITE = 1 << 1
@@ -42,6 +41,25 @@ VMA_ATTR_PRIVATE_HUGE_TLB = 'Private_Hugetlb'
 VMA_ATTR_SWAP = 'Swap'
 VMA_ATTR_SWAP_PSS = 'SwapPss'
 VMA_ATTR_LOCKED = 'Locked'
+
+TABLE_NAME_RAW = "raw"
+TABLE_NAME_SMAPS = "smaps"
+
+TABLE_NAME_SMAPS_SQL = '''CREATE VIEW IF NOT EXISTS {} as SELECT name, 
+size as Vss,
+COUNT(name) as times,
+TOTAL(Pss + SwapPss) as TotalPss,
+TOTAL(Pss) as Pss,
+TOTAL(SwapPss) as SwapPss,
+TOTAL(Shared_Clean + Shared_Dirty) as Shared,
+TOTAL(Shared_clean) as Shared_Clean,
+TOTAL(Shared_Dirty) as Shared_Dirty,
+TOTAL(Private_Clean + Private_Dirty) as Uss,
+TOTAL(Private_Clean) as Private_Clean,
+TOTAL(Private_Dirty) as Private_Dirty,
+TOTAL(Locked) as Locked
+FROM raw 
+GROUP BY name'''.format(TABLE_NAME_SMAPS)
 
 
 def make_flags(flags_str: str):
@@ -83,55 +101,66 @@ def match_vma_vmFlags(line):
     return re.match(r'(\w*)\s*:\s+([0-9]+)\skB', line)
 
 
+def sqType(typed):
+    if type(typed) == int:
+        return 'INT'
+    elif type(typed) == str:
+        return 'TEXT'
+
+
+def dict_factory(cursor, row):
+    # 将游标获取的数据处理成字典返回
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+    return d
+
+
+def parseVma(contents):
+    vma_list = []
+    vma_parsing = None
+    for content in contents:
+        matched = match_vma(content)
+        if matched:
+            if vma_parsing:
+                vma_list.append(vma_parsing)
+            vma_parsing = {}
+            parser_vma(vma_parsing, list(matched.groups()))
+            continue
+
+        matched = match_vma_attrs(content)
+        if matched:
+            attr_key = matched.group(1)
+            attr_value = matched.group(2)
+            vma_parsing[attr_key] = int(attr_value)
+    return vma_list
+
+
 class SmapsDatabase:
     cursor: Cursor
     conn: Connection
 
-    @staticmethod
-    def dict_factory(cursor, row):
-        # 将游标获取的数据处理成字典返回
-        d = {}
-        for idx, col in enumerate(cursor.description):
-            d[col[0]] = row[idx]
-        return d
-
-    @staticmethod
-    def sqType(typed):
-        if type(typed) == int:
-            return 'INT'
-        elif type(typed) == str:
-            return 'TEXT'
-
-    def __init__(self, sample: dict, database_name):
+    def __init__(self, database_name=':memory:'):
         self.conn = sqlite3.connect(database_name)
-        self.conn.row_factory = SmapsDatabase.dict_factory
+        self.conn.row_factory = dict_factory
         self.cursor = self.conn.cursor()
+
+    def padding(self, contents: collections):
+        vma_list = parseVma(contents)
+        vma_sample = vma_list[0]
         layout = ""
-        for sample_key, sample_value in sample.items():
-            layout += '{} {} NOT NULL,'.format(sample_key, SmapsDatabase.sqType(sample_value))
+        for sample_key, sample_value in vma_sample.items():
+            layout += '{} {} NOT NULL,'.format(sample_key, sqType(sample_value))
         layout = layout[0:-1]
-        sql_create_table = "CREATE TABLE smaps ({});".format(layout)
-        self.cursor.execute(sql_create_table)
-        self.conn.commit()
+        sql_create_table = "CREATE TABLE IF NOT EXISTS {} ({});".format(TABLE_NAME_RAW, layout)
+        self.execute(sql_create_table)
+        self.execute(TABLE_NAME_SMAPS_SQL)
 
-    #
-    # def __init__(self, sample: str):
-    #     self.conn = sqlite3.connect(':memory:')
-    #     self.conn.row_factory = SmapsDatabase.dict_factory
-    #     self.cursor = self.conn.cursor()
-    #     layout = ""
-    #     for sample_key, sample_value in sample.items():
-    #         layout += '{} {} NOT NULL,'.format(sample_key, SmapsDatabase.sqType(sample_value))
-    #     layout = layout[0:-1]
-    #     sql_create_table = "CREATE TABLE smaps ({});".format(layout)
-    #     self.cursor.execute(sql_create_table)
-    #     self.conn.commit()
+        columns = ', '.join(vma_sample.keys())
+        placeholders = ':' + ', :'.join(vma_sample.keys())
 
-    def insert(self, dict_data):
-        columns = ', '.join(dict_data.keys())
-        placeholders = ':' + ', :'.join(dict_data.keys())
-        query = 'INSERT INTO smaps (%s) VALUES (%s)' % (columns, placeholders)
-        self.cursor.execute(query, dict_data)
+        query = 'INSERT INTO %s (%s) VALUES (%s)' % (TABLE_NAME_RAW, columns, placeholders)
+        self.cursor.executemany(query, vma_list)
         self.conn.commit()
 
     def execute(self, sql_command, commit=False):
@@ -139,37 +168,3 @@ class SmapsDatabase:
         if commit:
             self.conn.commit()
         return result
-
-
-class SysMaps(List[Dict]):
-    db: SmapsDatabase = None
-    label = None
-
-    def __init__(self, contents: collections, label=':memory:'):
-        super().__init__()
-        self.label = label
-        vma_parsing = None
-        for content in contents:
-            matched = match_vma(content)
-            if matched:
-                if vma_parsing:
-                    self.append(vma_parsing)
-                vma_parsing = {}
-                parser_vma(vma_parsing, list(matched.groups()))
-                continue
-
-            matched = match_vma_attrs(content)
-            if matched:
-                attr_key = matched.group(1)
-                attr_value = matched.group(2)
-                vma_parsing[attr_key] = int(attr_value)
-
-    def getDataBase(self):
-        if self.db:
-            return self.db
-        else:
-            self.db = SmapsDatabase(self[0], self.label)
-            for i in self:
-                self.db.insert(i)
-
-        return self.db

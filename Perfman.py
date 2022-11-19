@@ -5,7 +5,8 @@ from pyecharts import options as opts
 from pyecharts.charts import Pie, Page
 
 import sysmaps
-from sysmaps import SysMaps
+from sysmaps import SmapsDatabase
+
 
 _HEAP_BIT = 16
 _HEAP_MASK = 0xFFFF << 16
@@ -154,5 +155,5 @@ def method_name(pie_data, pie_title):
 
 
 if __name__ == '__main__':
-    dut = SysMaps(open("/home/ubuntu/Temp/smaps"), "calendar.db")
-    dut.getDataBase()
+    db = SmapsDatabase("test.db")
+    db.padding(os.popen("adb shell cat /proc/$(pidof com.android.settings)/smaps"))
