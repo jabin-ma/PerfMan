@@ -45,7 +45,8 @@ VMA_ATTR_LOCKED = 'Locked'
 TABLE_NAME_RAW = "raw"
 TABLE_NAME_SMAPS = "smaps"
 
-TABLE_NAME_SMAPS_SQL = '''CREATE VIEW IF NOT EXISTS {} as SELECT name, 
+TABLE_NAME_SMAPS_SQL = '''CREATE VIEW IF NOT EXISTS {} as 
+SELECT name,tag, 
 size as Vss,
 COUNT(name) as times,
 TOTAL(Pss + SwapPss) as TotalPss,
@@ -59,7 +60,7 @@ TOTAL(Private_Clean) as Private_Clean,
 TOTAL(Private_Dirty) as Private_Dirty,
 TOTAL(Locked) as Locked
 FROM raw 
-GROUP BY name'''.format(TABLE_NAME_SMAPS)
+GROUP BY name,tag'''.format(TABLE_NAME_SMAPS)
 
 
 def make_flags(flags_str: str):
@@ -145,17 +146,19 @@ class SmapsDatabase:
         self.conn.row_factory = dict_factory
         self.cursor = self.conn.cursor()
 
-    def padding(self, contents: collections):
+    def padding(self, tag: str, contents: collections):
         vma_list = parseVma(contents)
+        # append tag
+        for tag_temp in vma_list:
+            tag_temp['tag'] = tag
         vma_sample = vma_list[0]
-        layout = ""
+        layout = []
         for sample_key, sample_value in vma_sample.items():
-            layout += '{} {} NOT NULL,'.format(sample_key, sqType(sample_value))
-        layout = layout[0:-1]
-        sql_create_table = "CREATE TABLE IF NOT EXISTS {} ({});".format(TABLE_NAME_RAW, layout)
+            layout.append('{} {} NOT NULL'.format(sample_key, sqType(sample_value)))
+        sql_create_table = "CREATE TABLE IF NOT EXISTS {} ({});".format(TABLE_NAME_RAW, ','.join(layout))
+
         self.execute(sql_create_table)
         self.execute(TABLE_NAME_SMAPS_SQL)
-
         columns = ', '.join(vma_sample.keys())
         placeholders = ':' + ', :'.join(vma_sample.keys())
 
