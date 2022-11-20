@@ -64,21 +64,21 @@ HEAP_DALVIK_ZYGOTE = make_HeapType(2, 3)
 HEAP_DALVIK_NON_MOVING = make_HeapType(2, 4)
 
 # Dalvik other extra sections.                =
-HEAP_DALVIK_OTHER_LINEARALLOC = make_HeapType(23, 1)
-HEAP_DALVIK_OTHER_ACCOUNTING = make_HeapType(23, 2)
-HEAP_DALVIK_OTHER_ZYGOTE_CODE_CACHE = make_HeapType(23, 3)
-HEAP_DALVIK_OTHER_APP_CODE_CACHE = make_HeapType(23, 4)
-HEAP_DALVIK_OTHER_COMPILER_METADATA = make_HeapType(23, 5)
-HEAP_DALVIK_OTHER_INDIRECT_REFERENCE_TABLE = make_HeapType(23, 6)
+HEAP_DALVIK_OTHER_LINEARALLOC = make_HeapType(5, 1)
+HEAP_DALVIK_OTHER_ACCOUNTING = make_HeapType(5, 2)
+HEAP_DALVIK_OTHER_ZYGOTE_CODE_CACHE = make_HeapType(5, 3)
+HEAP_DALVIK_OTHER_APP_CODE_CACHE = make_HeapType(5, 4)
+HEAP_DALVIK_OTHER_COMPILER_METADATA = make_HeapType(5, 5)
+HEAP_DALVIK_OTHER_INDIRECT_REFERENCE_TABLE = make_HeapType(5, 6)
 
 # Boot vdex / app dex / app vdex              =      make_HeapType(24, 1)
-HEAP_DEX_BOOT_VDEX = make_HeapType(24, 2)
-HEAP_DEX_APP_DEX = make_HeapType(24, 3)
-HEAP_DEX_APP_VDEX = make_HeapType(24, 4)
+HEAP_DEX_BOOT_VDEX = make_HeapType(15, 2)
+HEAP_DEX_APP_DEX = make_HeapType(15, 3)
+HEAP_DEX_APP_VDEX = make_HeapType(15, 4)
 
 # App art boot art.                           =
-HEAP_ART_APP = make_HeapType(25, 1)
-HEAP_ART_BOOT = make_HeapType(25, 2)
+HEAP_ART_APP = make_HeapType(17, 1)
+HEAP_ART_BOOT = make_HeapType(17, 2)
 
 HEAP_MMAP: Dict[str, HeapType] = {
     r'^\[heap\]': HEAP_NATIVE,
@@ -101,7 +101,7 @@ HEAP_MMAP: Dict[str, HeapType] = {
     r'^\/dev\/kgsl-3d0': HEAP_GL_DEV,
 
     r'^\/dev\/ashmem\/CursorWindow': HEAP_CURSOR,
-    r'^\/dev\/ashmem\/jit-zygote-cache': HEAP_DALVIK_OTHER,  # sub-zygote-code-cache
+    r'^\/dev\/ashmem\/jit-zygote-cache': HEAP_DALVIK_OTHER_ZYGOTE_CODE_CACHE,  # sub-zygote-code-cache
     r'^\/dev\/ashmem': HEAP_ASHMEM,
     r'^\/dev\/': HEAP_UNKNOWN_DEV,
     r'^\/memfd:jit-cache': HEAP_DALVIK_OTHER_APP_CODE_CACHE,
