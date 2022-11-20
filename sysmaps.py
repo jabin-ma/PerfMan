@@ -156,15 +156,18 @@ class SmapsDatabase:
         for sample_key, sample_value in vma_sample.items():
             layout.append('{} {} NOT NULL'.format(sample_key, sqType(sample_value)))
         sql_create_table = "CREATE TABLE IF NOT EXISTS {} ({});".format(TABLE_NAME_RAW, ','.join(layout))
-
         self.execute(sql_create_table)
         self.execute(TABLE_NAME_SMAPS_SQL)
         columns = ', '.join(vma_sample.keys())
         placeholders = ':' + ', :'.join(vma_sample.keys())
-
         query = 'INSERT INTO %s (%s) VALUES (%s)' % (TABLE_NAME_RAW, columns, placeholders)
         self.cursor.executemany(query, vma_list)
         self.conn.commit()
+
+    def popPss(self,tag):
+        self.popColumn('Pss')
+    def popColumn(self,tag,colum):
+        self.execute('SELECT ? FROM smaps')
 
     def execute(self, sql_command, commit=False):
         result = self.cursor.execute(sql_command)

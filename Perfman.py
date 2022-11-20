@@ -1,10 +1,10 @@
+import collections
 import os
 from typing import Dict
 
 from pyecharts import options as opts
-from pyecharts.charts import Pie, Page, Grid
+from pyecharts.charts import Pie
 
-import sysmaps
 from sysmaps import SmapsDatabase
 
 _HEAP_BIT = 16
@@ -145,36 +145,41 @@ def createPie(datas, title) -> Pie:
     return pie
 
 
-def method_name(pie_title, pie_data, name_key, value_key):
+def createPieData(pie_data, name_key, value_key):
     pie_data_title = [dict_item[name_key] for dict_item in pie_data]
     pie_data_value = [dict_item[value_key] for dict_item in pie_data]
     print(pie_data_value)
     pie_data = list(zip(pie_data_title, pie_data_value))
-    return createPie(pie_data, pie_title)
+    return pie_data
+
+
+class DataSet:
+    tag: str
+    data: collections
+
+    def __init__(self, tag, data: collections):
+        self.tag = tag
+        self.data = data
+
+
+def renderCompareSummary(dataA: DataSet, dataB: DataSet):
+    db = SmapsDatabase("test.db")
+    db.padding(dataB.tag, dataB.data)
+    db.padding(dataA.tag, dataA.data)
 
 
 if __name__ == '__main__':
-    db = SmapsDatabase()
-    db.padding('settings', os.popen("adb shell cat /proc/$(pidof com.android.settings)/smaps"))
-    result = db.execute('select * from smaps where tag=\'settings\' limit 5')
-    result_list = [d for d in result]
-    mypie = method_name("TEST", result_list, 'name', 'TotalPss')
-
+    renderCompareSummary(
+        DataSet("settings ", os.popen("adb shell cat /proc/$(pidof com.android.settings)/smaps")),
+        DataSet('systemui', os.popen("adb shell cat /proc/$(pidof com.android.systemui)/smaps"))
+    )
+    # db = SmapsDatabase()
     #
-    db.padding('systemui', os.popen("adb shell cat /proc/$(pidof com.android.systemui)/smaps"))
-    result = db.execute('select * from smaps where tag=\'systemui\'  limit 5')
-    result_list = [d for d in result]
-    mypie2 = method_name("TEST", result_list, 'name', 'TotalPss')
-    grid = (
-        Grid()
-        .add(mypie, grid_opts=opts.GridOpts(pos_top="55%"))
-        .add(mypie2, grid_opts=opts.GridOpts(pos_bottom="55%"))
-        .render("grid_horizontal.html")
-    )
-    page = (
-        Page()
-        .add(mypie)
-        .add(mypie2)
-        .render('page.html')
-    )
-
+    # db.padding('settings', os.popen("adb shell cat /proc/$(pidof com.android.settings)/smaps"))
+    # result = db.execute('select * from smaps where tag=\'settings\' limit 5')
+    # result_list = [d for d in result]
+    # DataSet('AAA', os.popen("adb shell cat /proc/$(pidof com.android.settings)/smaps"))
+    # #
+    # db.padding('systemui', os.popen("adb shell cat /proc/$(pidof com.android.systemui)/smaps"))
+    # result = db.execute('select * from smaps where tag=\'systemui\'  limit 5')
+    # result_list2 = [d for d in result]
