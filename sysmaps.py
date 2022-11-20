@@ -47,6 +47,10 @@ TABLE_NAME_SMAPS = "smaps"
 
 TABLE_NAME_SMAPS_SQL = '''CREATE VIEW IF NOT EXISTS {} as 
 SELECT name,tag, 
+(
+ SELECT type FROM mem_type WHERE REGEXP(mem_type.rex_rule,raw.name)
+)
+as type,
 size as Vss,
 COUNT(name) as times,
 TOTAL(Pss + SwapPss) as TotalPss,
@@ -102,21 +106,6 @@ def match_vma_vmFlags(line):
     return re.match(r'(\w*)\s*:\s+([0-9]+)\skB', line)
 
 
-def sqType(typed):
-    if type(typed) == int:
-        return 'INT'
-    elif type(typed) == str:
-        return 'TEXT'
-
-
-def dict_factory(cursor, row):
-    # 将游标获取的数据处理成字典返回
-    d = {}
-    for idx, col in enumerate(cursor.description):
-        d[col[0]] = row[idx]
-    return d
-
-
 def parseVma(contents):
     vma_list = []
     vma_parsing = None
@@ -137,13 +126,35 @@ def parseVma(contents):
     return vma_list
 
 
+def sql_regexp(expr, item):
+    print("{},{}".format(expr,item))
+    reg = re.compile(expr)
+    return reg.search(item) is not None
+
+
+def sql_Type(typed):
+    if type(typed) == int:
+        return 'INT'
+    elif type(typed) == str:
+        return 'TEXT'
+
+
+def sql_dict_factory(cursor, row):
+    # 将游标获取的数据处理成字典返回
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+    return d
+
+
 class SmapsDatabase:
     cursor: Cursor
     conn: Connection
 
     def __init__(self, database_name=':memory:'):
         self.conn = sqlite3.connect(database_name)
-        self.conn.row_factory = dict_factory
+        self.conn.row_factory = sql_dict_factory
+        self.conn.create_function("REGEXP", 2, sql_regexp)
         self.cursor = self.conn.cursor()
 
     def padding(self, tag: str, contents: collections):
@@ -154,7 +165,7 @@ class SmapsDatabase:
         vma_sample = vma_list[0]
         layout = []
         for sample_key, sample_value in vma_sample.items():
-            layout.append('{} {} NOT NULL'.format(sample_key, sqType(sample_value)))
+            layout.append('{} {} NOT NULL'.format(sample_key, sql_Type(sample_value)))
         sql_create_table = "CREATE TABLE IF NOT EXISTS {} ({});".format(TABLE_NAME_RAW, ','.join(layout))
         self.execute(sql_create_table)
         self.execute(TABLE_NAME_SMAPS_SQL)
@@ -164,13 +175,14 @@ class SmapsDatabase:
         self.cursor.executemany(query, vma_list)
         self.conn.commit()
 
-    def popPss(self,tag):
+    def popPss(self, tag):
         self.popColumn('Pss')
-    def popColumn(self,tag,colum):
+
+    def popColumn(self, tag, colum):
         self.execute('SELECT ? FROM smaps')
 
     def execute(self, sql_command, commit=False):
-        result = self.cursor.execute(sql_command)
+        self.cursor.execute(sql_command)
         if commit:
             self.conn.commit()
-        return result
+        return self.cursor.fetchall()
