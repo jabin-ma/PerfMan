@@ -1,11 +1,9 @@
 import collections
 import os
-import re
 
 from pyecharts import options as opts
 from pyecharts.charts import Pie
 
-from memtype import MEM_TYPE
 from sysmaps import SmapsDatabase
 
 
@@ -53,29 +51,7 @@ def renderCompareSummary(dataA: DataSet, dataB: DataSet):
 
 
 if __name__ == '__main__':
-    # renderCompareSummary(
-    #     DataSet("settings ", os.popen("adb shell cat /proc/$(pidof com.android.settings)/smaps")),
-    #     DataSet('systemui', os.popen("adb shell cat /proc/$(pidof com.android.systemui)/smaps"))
-    # )
-    test = '/system/framework/boot-framework.art'
-    for dict_item in MEM_TYPE:
-        rex = dict_item['regex']
-        if re.search(rex, test):
-            type_str = dict_item['type']
-            if 'subtype' in dict_item:
-                type_str += '-'
-                type_str += dict_item['subtype']
-
-            print('{} {}'.format(rex,type_str))
-
-
-    # db = SmapsDatabase()
-    #
-    # db.padding('settings', os.popen("adb shell cat /proc/$(pidof com.android.settings)/smaps"))
-    # result = db.execute('select * from smaps where tag=\'settings\' limit 5')
-    # result_list = [d for d in result]
-    # DataSet('AAA', os.popen("adb shell cat /proc/$(pidof com.android.settings)/smaps"))
-    # #
-    # db.padding('systemui', os.popen("adb shell cat /proc/$(pidof com.android.systemui)/smaps"))
-    # result = db.execute('select * from smaps where tag=\'systemui\'  limit 5')
-    # result_list2 = [d for d in result]
+    renderCompareSummary(
+        DataSet("settings", os.popen('adb shell "cat /proc/\\$(pidof com.android.settings)/smaps"')),
+        DataSet('systemui', os.popen('adb shell "cat /proc/\\$(pidof com.android.systemui)/smaps"'))
+    )

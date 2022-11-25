@@ -4,6 +4,9 @@ import re
 import sqlite3
 from sqlite3 import Cursor, Connection
 
+import Utils
+from memtype import MEM_TYPE
+
 _FLAG_READ = 1
 _FLAG_WRITE = 1 << 1
 _FLAG_EXEC = 1 << 2
@@ -48,9 +51,11 @@ TABLE_NAME_SMAPS = "smaps"
 TABLE_NAME_SMAPS_SQL = '''CREATE VIEW IF NOT EXISTS {} as 
 SELECT name,tag, 
 (
- SELECT type FROM mem_type WHERE REGEXP(mem_type.rex_rule,raw.name)
-)
-as type,
+ SELECT type FROM memory_type WHERE REGEXP(memory_type.regex,raw.name)
+) as type,
+(
+ SELECT subtype FROM memory_type WHERE REGEXP(memory_type.regex,raw.name)
+) as subtype,
 size as Vss,
 COUNT(name) as times,
 TOTAL(Pss + SwapPss) as TotalPss,
@@ -66,6 +71,12 @@ TOTAL(Locked) as Locked
 FROM raw 
 GROUP BY name,tag'''.format(TABLE_NAME_SMAPS)
 
+TABLE_MEMTYPE_SQL = '''CREATE TABLE IF NOT EXISTS memory_type (
+regex TEXT NOT NULL,
+type TEXT NOT NULL,
+subtype TEXT 
+)'''
+
 
 def make_flags(flags_str: str):
     temp_flags = 0
@@ -73,10 +84,6 @@ def make_flags(flags_str: str):
         if flag_char in FLAGS_MMAP:
             temp_flags |= FLAGS_MMAP[flag_char]
     return temp_flags
-
-
-def pop_hex(hex_str: list):
-    return int(hex_str.pop(0), 16)
 
 
 def match_vma(line):
@@ -91,7 +98,7 @@ def match_vma(line):
 
 
 def parser_vma(result: dict, attrs: list):
-    result[VMA_ATTR_START], result[VMA_ATTR_END] = pop_hex(attrs), pop_hex(attrs)
+    result[VMA_ATTR_START], result[VMA_ATTR_END] = Utils.pop_hex(attrs), Utils.pop_hex(attrs)
     result[VMA_ATTR_FLAGS] = make_flags(attrs.pop(0))
     result[VMA_ATTR_NAME] = attrs.pop()
     result[VMA_ATTR_OFFSET], result[VMA_ATTR_MAJOR], result[VMA_ATTR_MINOR], result[VMA_ATTR_INODE] = list(
@@ -126,36 +133,20 @@ def parseVma(contents):
     return vma_list
 
 
-def sql_regexp(expr, item):
-    print("{},{}".format(expr,item))
-    reg = re.compile(expr)
-    return reg.search(item) is not None
-
-
-def sql_Type(typed):
-    if type(typed) == int:
-        return 'INT'
-    elif type(typed) == str:
-        return 'TEXT'
-
-
-def sql_dict_factory(cursor, row):
-    # 将游标获取的数据处理成字典返回
-    d = {}
-    for idx, col in enumerate(cursor.description):
-        d[col[0]] = row[idx]
-    return d
-
-
 class SmapsDatabase:
-    cursor: Cursor
-    conn: Connection
+    __cursor: Cursor
+    __conn: Connection
 
     def __init__(self, database_name=':memory:'):
-        self.conn = sqlite3.connect(database_name)
-        self.conn.row_factory = sql_dict_factory
-        self.conn.create_function("REGEXP", 2, sql_regexp)
-        self.cursor = self.conn.cursor()
+        self.__conn = sqlite3.connect(database_name)
+        self.__conn.row_factory = Utils.sql_dict_factory
+        self.__conn.create_function("REGEXP", 2, Utils.sql_regexp)
+        self.__cursor = self.__conn.cursor()
+        self.__cursor.execute(TABLE_MEMTYPE_SQL)
+        for it in MEM_TYPE:
+            if 'subtype' not in it:
+                it['subtype'] = None
+        self.insertMany(MEM_TYPE, 'memory_type')
 
     def padding(self, tag: str, contents: collections):
         vma_list = parseVma(contents)
@@ -165,24 +156,18 @@ class SmapsDatabase:
         vma_sample = vma_list[0]
         layout = []
         for sample_key, sample_value in vma_sample.items():
-            layout.append('{} {} NOT NULL'.format(sample_key, sql_Type(sample_value)))
-        sql_create_table = "CREATE TABLE IF NOT EXISTS {} ({});".format(TABLE_NAME_RAW, ','.join(layout))
-        self.execute(sql_create_table)
-        self.execute(TABLE_NAME_SMAPS_SQL)
-        columns = ', '.join(vma_sample.keys())
-        placeholders = ':' + ', :'.join(vma_sample.keys())
-        query = 'INSERT INTO %s (%s) VALUES (%s)' % (TABLE_NAME_RAW, columns, placeholders)
-        self.cursor.executemany(query, vma_list)
-        self.conn.commit()
+            layout.append('{} {} NOT NULL'.format(sample_key, Utils.sql_Type(sample_value)))
+        sql_create_table = 'CREATE TABLE IF NOT EXISTS {} ({})'.format(TABLE_NAME_RAW, ','.join(layout))
 
-    def popPss(self, tag):
-        self.popColumn('Pss')
+        # create tables
+        self.__cursor.execute(sql_create_table)
+        self.__cursor.execute(TABLE_NAME_SMAPS_SQL)
 
-    def popColumn(self, tag, colum):
-        self.execute('SELECT ? FROM smaps')
+        # insert data
+        self.insertMany(vma_list, TABLE_NAME_RAW)
+        self.__conn.commit()
 
-    def execute(self, sql_command, commit=False):
-        self.cursor.execute(sql_command)
-        if commit:
-            self.conn.commit()
-        return self.cursor.fetchall()
+    def insertMany(self, dict_list: list[dict], table_name, commit=False):
+        sql_temp = Utils.sql_make_from_dict(dict_list[0], table_name)
+        self.__cursor.executemany(sql_temp, dict_list)
+        del sql_temp
