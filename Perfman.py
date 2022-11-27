@@ -2,7 +2,7 @@ import collections
 import os
 
 from pyecharts import options as opts
-from pyecharts.charts import Pie, Grid
+from pyecharts.charts import Pie, Grid, Tab, Line, Bar
 
 from sysmaps import SmapsDatabase
 
@@ -46,22 +46,28 @@ class DataSet:
 
 
 def renderCompareSummary(dataA: DataSet, dataB: DataSet):
+    pie = Pie(init_opts=opts.InitOpts(width='100%', height='1020px'))
+    pie.set_global_opts(toolbox_opts=opts.ToolboxOpts())
+
     db = SmapsDatabase()
     db.padding(dataB.tag, dataB.data)
     db.padding(dataA.tag, dataA.data)
+
     result = db.popColumn(dataA.tag, 'Pss', order=True, limit=5)
+
     pie_data = createPieData(result, 'name', 'Pss')
-    pie = createPie(pie_data, title=dataA.tag +'-PSS', center=['30%', '30%'], radius='30%')
+    pie.add(dataA.tag, pie_data, center=['30%', '30%'], radius='30%')
 
     result = db.popColumn(dataB.tag, 'Pss', order=True, limit=5)
     pie_data = createPieData(result, 'name', 'Pss')
-    pie2 = createPie(pie_data, title=dataB.tag +'-PSS', center=['70%', '30%'], radius='30%', title_pos_left='50%')
+    pie.add(dataB.tag, pie_data, center=['70%', '30%'], radius='30%')
 
+    pie.set_series_opts(label_opts=opts.LabelOpts(formatter="{b}  {c} : ({d})%"))
 
-    grid = Grid(init_opts=opts.InitOpts(width='100%', height='1080px'))
-    grid.add(pie, grid_opts=opts.GridOpts())
-    grid.add(pie2, grid_opts=opts.GridOpts())
-    grid.render('a.html')
+    tab = Tab(page_title='TITLE')
+    tab.add(pie, "Tab1")
+    # tab.add(grid_mutil_yaxis(), "Tab2")
+    tab.render('a.html')
 
 
 if __name__ == '__main__':
