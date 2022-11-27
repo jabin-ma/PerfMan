@@ -167,6 +167,16 @@ class SmapsDatabase:
         self.insertMany(vma_list, TABLE_NAME_RAW)
         self.__conn.commit()
 
+    def popColumn(self, tag, column, order=False, limit=0):
+        sql_sub = ''
+        if order:
+            sql_sub += ' ORDER BY {0} DESC'.format(tag)
+        if limit > 0:
+            sql_sub += ' LIMIT {}'.format(limit)
+        self.__cursor.execute(
+            'SELECT name,{1} FROM {0} WHERE tag = ? {2}'.format(TABLE_NAME_SMAPS, column, sql_sub), [tag])
+        return self.__cursor.fetchall()
+
     def insertMany(self, dict_list: list[dict], table_name, commit=False):
         sql_temp = Utils.sql_make_from_dict(dict_list[0], table_name)
         self.__cursor.executemany(sql_temp, dict_list)

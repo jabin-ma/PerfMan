@@ -45,13 +45,15 @@ class DataSet:
 
 
 def renderCompareSummary(dataA: DataSet, dataB: DataSet):
-    db = SmapsDatabase("test.db")
+    db = SmapsDatabase()
     db.padding(dataB.tag, dataB.data)
     db.padding(dataA.tag, dataA.data)
+    result = db.popColumn(dataA.tag, 'Pss')
+    print(result)
 
 
 if __name__ == '__main__':
     renderCompareSummary(
-        DataSet("settings", os.popen('adb shell "cat /proc/\\$(pidof com.android.settings)/smaps"')),
-        DataSet('systemui', os.popen('adb shell "cat /proc/\\$(pidof com.android.systemui)/smaps"'))
+        DataSet("settings", os.popen('adb shell "cat /proc/$(pidof com.android.settings)/smaps"')),
+        DataSet('systemui', os.popen('adb shell "cat /proc/$(pidof com.android.systemui)/smaps"'))
     )

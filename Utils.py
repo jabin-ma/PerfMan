@@ -1,8 +1,30 @@
 import re
 
+__DEBUG = False
+
+
+def __log(level, message):
+    print('{} {}'.format(level, message))
+
+
+def loge(message):
+    __log('ERROR', message)
+
+
+def logd(message):
+    if __DEBUG:
+        __log('DEBUG', message)
+
+
+def logi(message):
+    __log('INFO', message)
+
+
+# def loge(message):
+#     __log('ERROR', message)
 
 def sql_regexp(expr, item):
-    print("{},{}".format(expr, item))
+    logd("sql_regexp: {},{}".format(expr, item))
     reg = re.compile(expr)
     return reg.search(item) is not None
 
