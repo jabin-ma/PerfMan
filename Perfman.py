@@ -2,7 +2,7 @@ import collections
 import os
 
 from pyecharts import options as opts
-from pyecharts.charts import Pie
+from pyecharts.charts import Pie, Grid
 
 from sysmaps import SmapsDatabase
 
@@ -14,14 +14,15 @@ def totalDict(dicts, totalKeys):
     return total
 
 
-def createPie(datas, title) -> Pie:
+def createPie(datas, title, center=None, radius='100%', title_pos_left='5%') -> Pie:
+    if center is None:
+        center = ['50%', '50%']
     pie = Pie()
-    pie.add("", datas)
-    pie.set_global_opts(title_opts=opts.TitleOpts(title=title),
+    pie.add(title, datas, center=center, radius=radius)
+    pie.set_global_opts(title_opts=opts.TitleOpts(title=title, pos_left=title_pos_left),
                         legend_opts=opts.LegendOpts(
-                            pos_right="right",
-                            orient="vertical",
-                            is_show=False)
+                            pos_left=title_pos_left,
+                            is_show=True)
                         )
     pie.set_series_opts(label_opts=opts.LabelOpts(formatter="{b}  {c} : ({d})%"))
     return pie
@@ -48,8 +49,19 @@ def renderCompareSummary(dataA: DataSet, dataB: DataSet):
     db = SmapsDatabase()
     db.padding(dataB.tag, dataB.data)
     db.padding(dataA.tag, dataA.data)
-    result = db.popColumn(dataA.tag, 'Pss')
-    print(result)
+    result = db.popColumn(dataA.tag, 'Pss', order=True, limit=5)
+    pie_data = createPieData(result, 'name', 'Pss')
+    pie = createPie(pie_data, title=dataA.tag +'-PSS', center=['30%', '30%'], radius='30%')
+
+    result = db.popColumn(dataB.tag, 'Pss', order=True, limit=5)
+    pie_data = createPieData(result, 'name', 'Pss')
+    pie2 = createPie(pie_data, title=dataB.tag +'-PSS', center=['70%', '30%'], radius='30%', title_pos_left='50%')
+
+
+    grid = Grid(init_opts=opts.InitOpts(width='100%', height='1080px'))
+    grid.add(pie, grid_opts=opts.GridOpts())
+    grid.add(pie2, grid_opts=opts.GridOpts())
+    grid.render('a.html')
 
 
 if __name__ == '__main__':

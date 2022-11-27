@@ -170,7 +170,7 @@ class SmapsDatabase:
     def popColumn(self, tag, column, order=False, limit=0):
         sql_sub = ''
         if order:
-            sql_sub += ' ORDER BY {0} DESC'.format(tag)
+            sql_sub += ' ORDER BY {0} DESC'.format(column)
         if limit > 0:
             sql_sub += ' LIMIT {}'.format(limit)
         self.__cursor.execute(
